@@ -1,0 +1,16 @@
+{
+  "name": "ScreenQR Pro",
+  "short_name": "ScreenQR",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232563eb'/><path fill='white' d='M25 25h20v20H25zm30 0h20v20H55zm-30 30h20v20H25zm30 30h10v10H55zm10-10h10v10H65zm0-10h10v10H65zm-10 10h10v10H55z'/></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
