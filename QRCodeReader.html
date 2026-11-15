@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ScreenQR Scanner</title>
+  
+  <!-- Mobile & PWA Meta Tags -->
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ScreenQR">
+  <meta name="description" content="Instant QR code scanner for Android screens, screenshots, and clipboard images.">
+
+  <!-- Inline Web App Manifest via Data URI -->
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22ScreenQR%20Scanner%22%2C%22short_name%22%3A%22ScreenQR%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%230f172a%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill='%2338bdf8'%253E%253Cpath%20d%3D'M3%203h6v6H3V3zm2%202v2h2V5H5zm8-2h6v6h-6V3zm2%202v2h2V5h-2zM3%2013h6v6H3v-6zm2%202v2h2v-2H5zm13-2h-3v2h3v-2zm-3%203h2v3h-2v-3zm5-1h1v4h-4v-1h3v-3zm0-2h-1v-2h2v3h-1v-1zm-6%201v-1h2v1h-2z'%2F%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%20512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2338bdf8'><path d='M3 3h6v6H3V3zm2 2v2h2V5H5zm8-2h6v6h-6V3zm2 2v2h2V5h-2zM3 13h6v6H3v-6zm2 2v2h2v-2H5zm13-2h-3v2h3v-2zm-3 3h2v3h-2v-3zm5-1h1v4h-4v-1h3v-3zm0-2h-1v-2h2v3h-1v-1zm-6 1v-1h2v1h-2z'/></svg>">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              400: '#38bdf8',
+              500: '#0284c7',
+              600: '#0369a1',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- jsQR Library CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <style>
+    /* Prevent rubber-banding on mobile web */
+    body {
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Pulse laser animation for scanning */
+    @keyframes scan-laser {
+      0%, 100% { top: 5%; opacity: 0.2; }
+      50% { top: 90%; opacity: 0.9; }
+    }
+    .scanner-line {
+      animation: scan-laser 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
+
+  <!-- Top App Bar -->
+  <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between shadow-sm">
+    <div class="flex items-center space-x-2.5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="font-bold text-base tracking-tight text-white flex items-center gap-1.5">
+          ScreenQR <span class="text-[10px] font-semibold uppercase tracking-wider bg-sky-500/10 text-sky-400 px-1.5 py-0.5 rounded border border-sky-500/20">Pro</span>
+        </h1>
+        <p class="text-[11px] text-slate-400">Mobile Screen & Image Decoder</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center space-x-1.5">
+      <button id="btn-quick-paste-header" title="Paste from Clipboard" class="p-2 text-slate-400 hover:text-white bg-slate-800/80 active:bg-slate-700 rounded-xl transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 w-full max-w-md mx-auto p-4 flex flex-col space-y-4">
+
+    <!-- Active Scanning / Preview Container -->
+    <div id="scanner-viewport-wrapper" class="relative hidden overflow-hidden rounded-2xl bg-slate-900 border border-sky-500/30 aspect-video shadow-2xl flex items-center justify-center">
+      <video id="screen-video" autoplay playsinline class="w-full h-full object-contain"></video>
+      <!-- Scanner animation line -->
+      <div class="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-sky-400 to-transparent scanner-line pointer-events-none shadow-[0_0_12px_#38bdf8]"></div>
+      <div class="absolute top-2 right-2 z-10">
+        <button id="btn-stop-stream" class="px-3 py-1.5 bg-rose-600/90 hover:bg-rose-500 active:bg-rose-700 text-white rounded-lg text-xs font-semibold backdrop-blur shadow flex items-center space-x-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          <span>Stop Scan</span>
+        </button>
+      </div>
+      <div class="absolute bottom-2 left-2 right-2 bg-slate-900/80 backdrop-blur px-2.5 py-1.5 rounded-lg text-[11px] text-sky-200 text-center truncate border border-slate-700/50">
+        Analyzing live screen feed... point at any QR code
+      </div>
+    </div>
+
+    <!-- Main Trigger Actions -->
+    <div class="grid grid-cols-1 gap-2.5">
+      <!-- 1. Screen Capture Stream -->
+      <button id="btn-scan-screen" class="group relative flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-sky-600 to-blue-700 active:scale-[0.98] transition duration-150 shadow-lg shadow-sky-900/40 text-left overflow-hidden">
+        <div class="flex items-center space-x-3.5 z-10">
+          <div class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-sm border border-white/20">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="font-semibold text-white text-base leading-tight">Scan My Screen</h2>
+            <p class="text-sky-100/80 text-xs mt-0.5">Live screen capture stream</p>
+          </div>
+        </div>
+        <div class="z-10 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </div>
+      </button>
+
+      <!-- 2. Dual Action Row: Clipboard & File Pick -->
+      <div class="grid grid-cols-2 gap-2.5">
+        <!-- Clipboard Button -->
+        <button id="btn-paste-clipboard" class="flex flex-col items-start p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 active:bg-slate-800/80 transition shadow">
+          <div class="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center mb-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </div>
+          <span class="font-medium text-sm text-slate-100">Paste Image</span>
+          <span class="text-[11px] text-slate-400 mt-0.5">From clipboard</span>
+        </button>
+
+        <!-- Upload File Button -->
+        <label for="file-upload" class="flex flex-col items-start p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 active:bg-slate-800/80 transition cursor-pointer shadow">
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mb-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <span class="font-medium text-sm text-slate-100">Upload Image</span>
+          <span class="text-[11px] text-slate-400 mt-0.5">Gallery / Screenshots</span>
+          <input id="file-upload" type="file" accept="image/png, image/jpeg, image/webp" class="hidden" />
+        </label>
+      </div>
+    </div>
+
+    <!-- Notification / Status Banner -->
+    <div id="status-banner" class="hidden text-xs py-2 px-3 rounded-xl border text-center transition-all duration-200"></div>
+
+    <!-- Active Result Card (Hidden until decoded) -->
+    <div id="result-card" class="hidden flex-col bg-slate-900 rounded-2xl border border-sky-500/40 p-4 shadow-xl shadow-sky-950/50 transition">
+      <div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-800">
+        <div class="flex items-center space-x-2">
+          <span class="relative flex h-2.5 w-2.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+          </span>
+          <span class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">QR Code Decoded</span>
+        </div>
+        <span id="result-timestamp" class="text-[11px] text-slate-400">Just now</span>
+      </div>
+
+      <!-- Decoded Content Box -->
+      <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 select-text max-h-36 overflow-y-auto break-all font-mono text-sm text-slate-200" id="result-text">
+        <!-- Decoded text inserted here -->
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="grid grid-cols-2 gap-2 mt-3.5">
+        <button id="btn-copy-result" class="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-slate-200 text-xs font-semibold transition border border-slate-700/60">
+          <svg id="copy-icon" class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+          </svg>
+          <span id="copy-text">Copy Text</span>
+        </button>
+
+        <a id="btn-open-link" href="#" target="_blank" rel="noopener noreferrer" class="hidden flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white text-xs font-semibold transition shadow-md shadow-sky-900/30">
+          <span>Open Link</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- Scan History Section -->
+    <div class="flex-1 flex flex-col pt-2">
+      <div class="flex items-center justify-between mb-2 px-1">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Scan History</h3>
+        <button id="btn-clear-history" class="text-xs text-rose-400/90 hover:text-rose-300 active:underline hidden">
+          Clear All
+        </button>
+      </div>
+
+      <div id="history-container" class="space-y-2 pb-6">
+        <!-- Render history cards or empty state -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Offscreen Processing Canvas -->
+  <canvas id="qr-canvas" class="hidden"></canvas>
+
+  <script>
+    // State & DOM Elements
+    let screenStream = null;
+    let scanAnimationId = null;
+    const historyStorageKey = 'screenqr_history_v1';
+
+    const scannerViewportWrapper = document.getElementById('scanner-viewport-wrapper');
+    const screenVideo = document.getElementById('screen-video');
+    const btnScanScreen = document.getElementById('btn-scan-screen');
+    const btnStopStream = document.getElementById('btn-stop-stream');
+    const btnPasteClipboard = document.getElementById('btn-paste-clipboard');
+    const btnQuickPasteHeader = document.getElementById('btn-quick-paste-header');
+    const fileUpload = document.getElementById('file-upload');
+    const statusBanner = document.getElementById('status-banner');
+    const resultCard = document.getElementById('result-card');
+    const resultText = document.getElementById('result-text');
+    const resultTimestamp = document.getElementById('result-timestamp');
+    const btnCopyResult = document.getElementById('btn-copy-result');
+    const copyText = document.getElementById('copy-text');
+    const copyIcon = document.getElementById('copy-icon');
+    const btnOpenLink = document.getElementById('btn-open-link');
+    const historyContainer = document.getElementById('history-container');
+    const btnClearHistory = document.getElementById('btn-clear-history');
+    const qrCanvas = document.getElementById('qr-canvas');
+    const ctx = qrCanvas.getContext('2d', { willReadFrequently: true });
+
+    // Show temporary alert banner
+    function showBanner(message, type = 'info') {
+      statusBanner.classList.remove('hidden', 'bg-emerald-950/80', 'border-emerald-700/60', 'text-emerald-300',
+        'bg-rose-950/80', 'border-rose-700/60', 'text-rose-300', 'bg-sky-950/80', 'border-sky-700/60', 'text-sky-300');
+
+      if (type === 'success') {
+        statusBanner.classList.add('bg-emerald-950/80', 'border-emerald-700/60', 'text-emerald-300');
+      } else if (type === 'error') {
+        statusBanner.classList.add('bg-rose-950/80', 'border-rose-700/60', 'text-rose-300');
+      } else {
+        statusBanner.classList.add('bg-sky-950/80', 'border-sky-700/60', 'text-sky-300');
+      }
+
+      statusBanner.textContent = message;
+      statusBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      clearTimeout(statusBanner._timeout);
+      statusBanner._timeout = setTimeout(() => {
+        statusBanner.classList.add('hidden');
+      }, 4500);
+    }
+
+    // Helper: Validate if string is URL
+    function isValidUrl(string) {
+      try {
+        const url = new URL(string.trim());
+        return url.protocol === 'http:' || url.protocol === 'https:';
+      } catch (_) {
+        return false;
+      }
+    }
+
+    // Process & Handle Scanned Result
+    function handleDecodedData(data) {
+      if (!data) return;
+
+      // Haptic feedback
+      if ('vibrate' in navigator) {
+        try {
+          navigator.vibrate(100);
+        } catch (_) {}
+      }
+
+      // Display Card
+      resultCard.classList.remove('hidden');
+      resultText.textContent = data;
+      resultTimestamp.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      // Link check
+      if (isValidUrl(data)) {
+        btnOpenLink.href = data.trim();
+        btnOpenLink.classList.remove('hidden');
+      } else {
+        btnOpenLink.classList.add('hidden');
+      }
+
+      // Reset Copy button visual state
+      copyText.textContent = 'Copy Text';
+      btnCopyResult.classList.remove('bg-emerald-800', 'text-white');
+
+      // Save to History
+      saveToHistory(data);
+      renderHistory();
+
+      showBanner('QR code successfully scanned!', 'success');
+    }
+
+    // Core jsQR Image Decoder
+    function decodeFromImageData(imgData) {
+      if (typeof jsQR === 'undefined') {
+        showBanner('QR Decoder library is still loading or unavailable.', 'error');
+        return null;
+      }
+      return jsQR(imgData.data, imgData.width, imgData.height, {
+        inversionAttempts: 'dontInvert',
+      }) || jsQR(imgData.data, imgData.width, imgData.height, {
+        inversionAttempts: 'onlyInvert',
+      });
+    }
+
+    // 1. Screen Capture Stream
+    async function startScreenCapture() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        showBanner('Screen capture is not supported on this browser/environment.', 'error');
+        return;
+      }
+
+      try {
+        stopScreenCapture(); // ensure clean state
+
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            cursor: 'always',
+            displaySurface: 'monitor'
+          },
+          audio: false
+        });
+
+        screenVideo.srcObject = screenStream;
+        scannerViewportWrapper.classList.remove('hidden');
+        showBanner('Screen capture active. Scanning frames...', 'info');
+
+        // Handle user stopping screen share via native browser bar
+        screenStream.getVideoTracks()[0].addEventListener('ended', () => {
+          stopScreenCapture();
+        });
+
+        // Start scanning loop
+        scanFrameLoop();
+      } catch (err) {
+        if (err.name === 'NotAllowedError') {
+          showBanner('Screen capture permission denied.', 'error');
+        } else {
+          showBanner('Error starting screen capture: ' + err.message, 'error');
+        }
+        stopScreenCapture();
+      }
+    }
+
+    function scanFrameLoop() {
+      if (!screenStream || screenVideo.readyState !== screenVideo.HAVE_ENOUGH_DATA) {
+        scanAnimationId = requestAnimationFrame(scanFrameLoop);
+        return;
+      }
+
+      // Resize hidden canvas to video dimensions
+      qrCanvas.width = screenVideo.videoWidth;
+      qrCanvas.height = screenVideo.videoHeight;
+      ctx.drawImage(screenVideo, 0, 0, qrCanvas.width, qrCanvas.height);
+
+      const imageData = ctx.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
+      const code = decodeFromImageData(imageData);
+
+      if (code && code.data) {
+        handleDecodedData(code.data);
+        stopScreenCapture();
+        return;
+      }
+
+      scanAnimationId = requestAnimationFrame(scanFrameLoop);
+    }
+
+    function stopScreenCapture() {
+      if (scanAnimationId) {
+        cancelAnimationFrame(scanAnimationId);
+        scanAnimationId = null;
+      }
+      if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
+        screenStream = null;
+      }
+      screenVideo.srcObject = null;
+      scannerViewportWrapper.classList.add('hidden');
+    }
+
+    // 2. Decode from Image Element / Blob
+    function decodeImageElement(imageElement) {
+      qrCanvas.width = imageElement.naturalWidth || imageElement.width;
+      qrCanvas.height = imageElement.naturalHeight || imageElement.height;
+      ctx.drawImage(imageElement, 0, 0, qrCanvas.width, qrCanvas.height);
+
+      const imageData = ctx.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
+      const code = decodeFromImageData(imageData);
+
+      if (code && code.data) {
+        handleDecodedData(code.data);
+      } else {
+        showBanner('No valid QR code found in the image.', 'error');
+      }
+    }
+
+    function processImageFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showBanner('Selected item is not a supported image.', 'error');
+        return;
+      }
+
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        decodeImageElement(img);
+        URL.revokeObjectURL(objectUrl);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        showBanner('Failed to load image file.', 'error');
+      };
+      img.src = objectUrl;
+    }
+
+    // 3. Clipboard Inspection
+    async function readClipboardImage() {
+      if (!navigator.clipboard) {
+        showBanner('Clipboard API not supported in this browser.', 'error');
+        return;
+      }
+
+      try {
+        // Modern async clipboard API
+        if (navigator.clipboard.read) {
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            const imageType = item.types.find(type => type.startsWith('image/'));
+            if (imageType) {
+              const blob = await item.getType(imageType);
+              processImageFile(blob);
+              return;
+            }
+          }
+        }
+        showBanner('No image found in clipboard. Take a screenshot or copy an image first!', 'error');
+      } catch (err) {
+        // Fallback info for permission rejection
+        showBanner('Could not read clipboard. Permission denied or no image copied.', 'error');
+      }
+    }
+
+    // Global Paste Event Listener (allows Ctrl+V or long-press paste anywhere)
+    window.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+      let handled = false;
+      for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+          const blob = item.getAsFile();
+          processImageFile(blob);
+          handled = true;
+          break;
+        }
+      }
+      if (!handled) {
+        showBanner('Pasted content did not contain an image.', 'error');
+      }
+    });
+
+    // 4. History Management (localStorage)
+    function getHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(historyStorageKey)) || [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function saveToHistory(text) {
+      const history = getHistory();
+      // Remove duplicate if exists at top
+      const filtered = history.filter(item => item.text !== text);
+      filtered.unshift({
+        text,
+        timestamp: new Date().toISOString()
+      });
+      // Limit to 30 items
+      const truncated = filtered.slice(0, 30);
+      try {
+        localStorage.setItem(historyStorageKey, JSON.stringify(truncated));
+      } catch (_) {}
+    }
+
+    function renderHistory() {
+      const history = getHistory();
+      historyContainer.innerHTML = '';
+
+      if (history.length === 0) {
+        btnClearHistory.classList.add('hidden');
+        historyContainer.innerHTML = `
+          <div class="text-center py-8 text-slate-500 text-xs">
+            No scanned QR codes yet.<br>Capture your screen or paste an image to begin.
+          </div>
+        `;
+        return;
+      }
+
+      btnClearHistory.classList.remove('hidden');
+
+      history.forEach((item, index) => {
+        const dateObj = new Date(item.timestamp);
+        const timeFormatted = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' +
+                              dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const isUrl = isValidUrl(item.text);
+
+        const card = document.createElement('div');
+        card.className = "p-3 rounded-xl bg-slate-900 border border-slate-800/80 hover:border-slate-700 flex flex-col space-y-2 transition";
+        card.innerHTML = `
+          <div class="flex items-center justify-between text-[11px] text-slate-400">
+            <span class="font-medium text-slate-300 truncate max-w-[200px]">${isUrl ? '🌐 Web Link' : '📄 Text Data'}</span>
+            <span>${timeFormatted}</span>
+          </div>
+          <div class="text-xs text-slate-200 font-mono break-all line-clamp-2 select-text">${escapeHtml(item.text)}</div>
+          <div class="flex items-center justify-end space-x-2 pt-1 border-t border-slate-800/60 text-xs">
+            <button class="btn-copy-history px-2 py-1 bg-slate-800 active:bg-slate-700 text-slate-300 rounded font-medium transition" data-index="${index}">
+              Copy
+            </button>
+            ${isUrl ? `<a href="${encodeURI(item.text)}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-sky-600/30 text-sky-400 active:bg-sky-600/50 rounded font-medium transition">Open</a>` : ''}
+          </div>
+        `;
+        historyContainer.appendChild(card);
+      });
+
+      // Bind history copy buttons
+      document.querySelectorAll('.btn-copy-history').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = e.currentTarget.getAttribute('data-index');
+          const targetItem = history[idx];
+          if (targetItem) {
+            navigator.clipboard.writeText(targetItem.text).then(() => {
+              e.currentTarget.textContent = 'Copied!';
+              setTimeout(() => { e.currentTarget.textContent = 'Copy'; }, 1800);
+            });
+          }
+        });
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Clear History
+    btnClearHistory.addEventListener('click', () => {
+      if (confirm('Clear all scan history?')) {
+        localStorage.removeItem(historyStorageKey);
+        renderHistory();
+      }
+    });
+
+    // Event Listeners for UI Actions
+    btnScanScreen.addEventListener('click', startScreenCapture);
+    btnStopStream.addEventListener('click', stopScreenCapture);
+    btnPasteClipboard.addEventListener('click', readClipboardImage);
+    btnQuickPasteHeader.addEventListener('click', readClipboardImage);
+
+    fileUpload.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        processImageFile(e.target.files[0]);
+        e.target.value = ''; // Reset input to allow re-uploading same file if desired
+      }
+    });
+
+    btnCopyResult.addEventListener('click', () => {
+      const text = resultText.textContent;
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        copyText.textContent = 'Copied to Clipboard!';
+        btnCopyResult.classList.add('bg-emerald-800', 'text-white');
+        setTimeout(() => {
+          copyText.textContent = 'Copy Text';
+          btnCopyResult.classList.remove('bg-emerald-800', 'text-white');
+        }, 2200);
+      }).catch(() => {
+        showBanner('Failed to copy text.', 'error');
+      });
+    });
+
+    // Initialize History on load
+    renderHistory();
+  </script>
+</body>
+</html>
